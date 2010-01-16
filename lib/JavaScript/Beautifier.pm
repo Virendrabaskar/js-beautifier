@@ -20,6 +20,8 @@ my (
   $just_added_newline
 );
 
+my $indent_on_next_kept_newline;
+
 my @whitespace = split( '', "\n\r\t " );
 my @wordchar   = split( '', 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$' );
 my @digits     = split( '', '0123456789' );
@@ -35,7 +37,7 @@ my @line_starter =
   split( ',', 'continue,try,throw,return,var,if,switch,case,default,for,while,break,function' );
 
 my ( $opt_indent_level, $opt_indent_size, $opt_indent_character, $opt_preserve_newlines,
-  $opt_space_after_anon_function );
+  $opt_space_after_anon_function, $opt_preserve_parameter_newlines );
 
 sub js_beautify {
   my ( $js_source_code, $opts ) = @_;
@@ -43,6 +45,7 @@ sub js_beautify {
   $opt_indent_size      = $opts->{indent_size}      || 4;
   $opt_indent_character = $opts->{indent_character} || ' ';
   $opt_preserve_newlines = exists $opts->{preserve_newlines} ? $opts->{preserve_newlines} : 1;
+  $opt_preserve_parameter_newlines = exists $opts->{preserve_parameter_newlines} ? $opts->{preserve_parameter_newlines} : 1;
   $opt_indent_level = $opts->{indent_level} ||= 0;
   $opt_space_after_anon_function =
     exists $opts->{space_after_anon_function} ? $opts->{space_after_anon_function} : 0;
@@ -189,6 +192,9 @@ sub js_beautify {
     } elsif ( $token_type eq 'TK_END_EXPR' ) {
       if ( $token_text eq ']' && $current_mode eq '[INDENTED-EXPRESSION]' ) {
         unindent();
+      }
+      if ( $token_text eq ')' && $current_mode eq '[INDENTED-EXPRESSION]' ) {
+	unindent();
       }
       restore_mode();
       print_token();
@@ -341,6 +347,16 @@ sub js_beautify {
       } elsif ( $prefix eq 'SPACE' ) {
         print_space();
       }
+
+      if (is_expression($current_mode) && $wanted_newline && $opt_preserve_parameter_newlines) {
+	if ($indent_on_next_kept_newline) {
+	  indent();
+	  set_mode('[INDENTED-EXPRESSION]');
+	  $indent_on_next_kept_newline = 0;
+	}
+	print_newline();
+      }
+
       print_token();
       $last_word = $token_text;
       if ( $token_text eq 'var' ) {
@@ -427,6 +443,9 @@ sub js_beautify {
           } else {
 
             # EXPR or DO_BLOCK
+	    if ($opt_preserve_parameter_newlines && $last_last_text eq '(') {
+	      $indent_on_next_kept_newline = 1;
+	    }
             print_token();
             print_space();
           }
@@ -680,8 +699,12 @@ sub get_next_token {
         print_newline($flag);
       }
     }
-    $wanted_newline = ( $n_newlines == 1 ) ? 1 : 0;
+    $wanted_newline = ( $n_newlines >= 1 ) ? 1 : 0;
   }
+  if ($opt_preserve_parameter_newlines) {
+    $wanted_newline = ( $n_newlines >= 1 ) ? 1 : 0;
+  }
+
   if ( grep { $c eq $_ } @wordchar ) {
     if ( $parser_pos < scalar @input ) {
       while ( grep { $input[$parser_pos] eq $_ } @wordchar ) {

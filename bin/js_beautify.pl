@@ -19,7 +19,7 @@ GetOptions(
 	"output=s",
 	"s|indent_size=i",
 	"c|indent_character=s",
-	"p|preserve_newlines",
+        "d|dont_preserve_newlines",
         "r|preserve_parameter_newlines",
 ) or pod2usage(2);
 
@@ -37,10 +37,13 @@ local $/;
 my $js_source_code = <$file_io>;
 $file_io->close;
 
+my $preserve_newlines = 1;
+$preserve_newlines = 0 if ($params{d});
+
 my $pretty_js = js_beautify( $js_source_code, {
     indent_size => $params{s} || 4,
     indent_character => $params{c} || ' ',
-    preserve_newlines => $params{p} || 1,
+    preserve_newlines => $preserve_newlines,
     preserve_parameter_newlines => $params{r} || 0
 } );
 

@@ -164,6 +164,8 @@ sub js_beautify {
         set_mode('(EXPRESSION)');
       }
 
+      $indent_on_next_kept_newline = 0;
+
       if ( $last_text eq ';' || $last_type eq 'TK_START_BLOCK' ) {
         print_newline();
       } elsif ( $last_type eq 'TK_END_EXPR' || $last_type eq 'TK_START_EXPR' ) {
@@ -195,6 +197,11 @@ sub js_beautify {
       }
       if ( $token_text eq ')' && $current_mode eq '[INDENTED-EXPRESSION]' ) {
 	unindent();
+      }
+      if ( $token_text eq ')' && $current_mode eq '[INDENTED-PARAMETERS]' ) {
+	  #push @output,"<<";
+	  unindent();
+	  restore_mode();
       }
       restore_mode();
       print_token();
@@ -348,14 +355,7 @@ sub js_beautify {
         print_space();
       }
 
-      if (is_expression($current_mode) && $wanted_newline && $opt_preserve_parameter_newlines) {
-	if ($indent_on_next_kept_newline) {
-	  indent();
-	  set_mode('[INDENTED-EXPRESSION]');
-	  $indent_on_next_kept_newline = 0;
-	}
-	print_newline();
-      }
+      indent_params();
 
       print_token();
       $last_word = $token_text;
@@ -385,6 +385,9 @@ sub js_beautify {
       } elsif ( $last_type eq 'TK_WORD' ) {
         print_space();
       }
+      
+      indent_params();
+
       print_token();
       $last_last_text = $last_text;
       $last_type      = $token_type;
@@ -622,9 +625,21 @@ sub set_mode {
 
 sub is_expression {
   my $mode = shift;
-  return ( $mode eq '[EXPRESSION]' || $mode eq '[INDENTED-EXPRESSION]' || $mode eq '(EXPRESSION)' )
+  return ( $mode eq '[EXPRESSION]' || $mode eq '[INDENTED-EXPRESSION]' || $mode eq '(EXPRESSION)' || $mode eq '[INDENTED-PARAMETERS]' )
     ? 1
     : 0;
+}
+
+sub indent_params {
+  if ( is_expression($current_mode) && $wanted_newline && $opt_preserve_parameter_newlines ) {
+    if ($indent_on_next_kept_newline) {
+      indent();
+      set_mode('[INDENTED-PARAMETERS]');
+      #push @output,">>";
+      $indent_on_next_kept_newline = 0;
+    }
+    print_newline();
+  }
 }
 
 sub restore_mode {
@@ -701,7 +716,7 @@ sub get_next_token {
     }
     $wanted_newline = ( $n_newlines >= 1 ) ? 1 : 0;
   }
-  if ($opt_preserve_parameter_newlines) {
+  if ($opt_preserve_parameter_newlines && is_expression($current_mode)) {
     $wanted_newline = ( $n_newlines >= 1 ) ? 1 : 0;
   }
 

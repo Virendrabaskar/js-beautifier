@@ -164,8 +164,6 @@ sub js_beautify {
         set_mode('(EXPRESSION)');
       }
 
-      $indent_on_next_kept_newline = 0;
-
       if ( $last_text eq ';' || $last_type eq 'TK_START_BLOCK' ) {
         print_newline();
       } elsif ( $last_type eq 'TK_END_EXPR' || $last_type eq 'TK_START_EXPR' ) {
@@ -187,21 +185,26 @@ sub js_beautify {
         print_space();
       }
       print_token();
+
+      if (is_expression($current_mode)) {
+        $indent_on_next_kept_newline = 1;
+      }
+
       $last_last_text = $last_text;
       $last_type      = $token_type;
       $last_text      = $token_text;
       next;
     } elsif ( $token_type eq 'TK_END_EXPR' ) {
+      $indent_on_next_kept_newline = 0;
+      if ( $current_mode eq '[INDENTED-PARAMETERS]' ) {
+	  restore_mode();
+	  unindent();
+      }
       if ( $token_text eq ']' && $current_mode eq '[INDENTED-EXPRESSION]' ) {
         unindent();
       }
       if ( $token_text eq ')' && $current_mode eq '[INDENTED-EXPRESSION]' ) {
 	unindent();
-      }
-      if ( $token_text eq ')' && $current_mode eq '[INDENTED-PARAMETERS]' ) {
-	  #push @output,"<<";
-	  unindent();
-	  restore_mode();
       }
       restore_mode();
       print_token();
@@ -378,6 +381,8 @@ sub js_beautify {
       $last_text      = $token_text;
       next;
     } elsif ( $token_type eq 'TK_STRING' ) {
+      indent_params();
+
       if ( $last_type eq 'TK_START_BLOCK'
         || $last_type eq 'TK_END_BLOCK'
         || $last_type eq 'TK_SEMICOLON' ) {
@@ -386,8 +391,6 @@ sub js_beautify {
         print_space();
       }
       
-      indent_params();
-
       print_token();
       $last_last_text = $last_text;
       $last_type      = $token_type;
@@ -446,9 +449,6 @@ sub js_beautify {
           } else {
 
             # EXPR or DO_BLOCK
-	    if ($opt_preserve_parameter_newlines && $last_last_text eq '(') {
-	      $indent_on_next_kept_newline = 1;
-	    }
             print_token();
             print_space();
           }
@@ -631,11 +631,11 @@ sub is_expression {
 }
 
 sub indent_params {
-  if ( is_expression($current_mode) && $wanted_newline && $opt_preserve_parameter_newlines ) {
+
+  if ( is_expression($current_mode) && $current_mode ne '[INDENTED-EXPRESSION]' && $wanted_newline && $opt_preserve_parameter_newlines ) {
     if ($indent_on_next_kept_newline) {
       indent();
       set_mode('[INDENTED-PARAMETERS]');
-      #push @output,">>";
       $indent_on_next_kept_newline = 0;
     }
     print_newline();

@@ -1,0 +1,17 @@
+;;; JS beautifier functions                                                                                                                                                                                
+(defun js-beautify-region ()
+ "Run js-beautify on the current region."
+ (interactive)
+ (save-excursion
+   (shell-command-on-region (point) (mark) "js_beautify.pl -s 2 -r -" nil t)
+   (javascript-mode)))
+
+(defun js-beautify-buffer ()
+ "Run js-beautify on buffer"
+ (interactive)
+ (let ((p (point)))
+   (save-excursion
+     (shell-command-on-region (point-min) (point-max) "js_beautify.pl -s 2 -r -" nil t)
+     )
+   (goto-char p)
+   (javascript-mode)))
